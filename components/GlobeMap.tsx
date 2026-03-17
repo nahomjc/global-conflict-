@@ -48,6 +48,7 @@ export function GlobeMap({
   selectedCountry,
   onCountrySelect,
 }: GlobeMapProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const globeRef = useRef<{
     controls: () => {
       autoRotate: boolean;
@@ -62,8 +63,27 @@ export function GlobeMap({
       needsUpdate: boolean;
     };
   } | null>(null);
+  const [globeSize, setGlobeSize] = useState({ width: 800, height: 500 });
   const [countries, setCountries] = useState<CountryPolygon[]>([]);
   const [satellites, setSatellites] = useState<SatellitePoint[]>([]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const updateSize = () => {
+      const width = Math.max(300, Math.floor(container.clientWidth));
+      const height = Math.max(420, Math.floor(container.clientHeight));
+      setGlobeSize({ width, height });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const t0 = Date.now();
@@ -157,13 +177,18 @@ export function GlobeMap({
   const radarRing = useMemo(() => [{ lat: 18, lng: -20, maxR: 18 }], []);
 
   return (
-    <div className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-950/70 sm:min-h-[500px] lg:min-h-[560px]">
+    <div
+      ref={containerRef}
+      className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-950/70 sm:min-h-[500px] lg:min-h-[560px]"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.12),transparent_38%),radial-gradient(circle_at_70%_80%,rgba(244,63,94,0.14),transparent_35%)]" />
       <div className="radar-overlay pointer-events-none absolute inset-0 z-10" />
 
-      <div className="h-full w-full translate-x-0 sm:-translate-x-[10%] md:-translate-x-[18%] lg:-translate-x-[30%]">
+      <div className="flex h-full w-full items-center justify-center">
         <Globe
           ref={globeRef}
+          width={globeSize.width}
+          height={globeSize.height}
           backgroundColor="rgba(2, 6, 23, 0.9)"
           globeImageUrl={EARTH_DAY_TEXTURE}
           bumpImageUrl={EARTH_BUMP_TEXTURE}
