@@ -1,8 +1,8 @@
 import * as FlagIcons from "country-flag-icons/react/3x2";
-import type { SVGProps } from "react";
+import type { ReactElement, SVGProps } from "react";
 import { getCountryDisplay } from "@/lib/country-display";
 
-type FlagComponent = (props: SVGProps<SVGSVGElement>) => JSX.Element;
+type FlagComponent = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
 export function CountryNameWithFlag({
   country,
