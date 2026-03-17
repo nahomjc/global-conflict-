@@ -1,65 +1,202 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { EventFeed } from "@/components/EventFeed";
+import { GlobeMap } from "@/components/GlobeMap";
+import { StatsPanel, type DateRangeFilter } from "@/components/StatsPanel";
+import type { AttackType, ConflictEvent, ConflictStats, ImpactPulse } from "@/lib/conflict-types";
+
+type StreamPacket =
+  | {
+      type: "bootstrap";
+      payload: { events: ConflictEvent[]; impacts: ImpactPulse[]; stats: ConflictStats };
+    }
+  | {
+      type: "event";
+      payload: { event: ConflictEvent; impacts: ImpactPulse[]; stats: ConflictStats };
+    };
+
+const DEFAULT_STATS: ConflictStats = {
+  totalAttacksToday: 0,
+  mostTargetedCountry: "N/A",
+  mostActiveAttacker: "N/A",
+  globalAlertLevel: "LOW",
+};
+
+function eventDateMs(event: ConflictEvent) {
+  const sourceMs = Date.parse(event.sourcePublishedAt);
+  if (!Number.isNaN(sourceMs)) {
+    return sourceMs;
+  }
+  const ingestMs = Date.parse(event.timestamp);
+  return Number.isNaN(ingestMs) ? 0 : ingestMs;
+}
 
 export default function Home() {
+  const [events, setEvents] = useState<ConflictEvent[]>([]);
+  const [impacts, setImpacts] = useState<ImpactPulse[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [activeTypes, setActiveTypes] = useState<AttackType[]>(["missile", "drone", "airstrike"]);
+  const [dateRange, setDateRange] = useState<DateRangeFilter>("today");
+
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+
+    const connect = async () => {
+      const response = await fetch("/api/events/bootstrap");
+      const bootstrap = (await response.json()) as {
+        wsPort: number;
+        events: ConflictEvent[];
+        impacts: ImpactPulse[];
+        stats: ConflictStats;
+      };
+
+      setEvents(bootstrap.events);
+      setImpacts(bootstrap.impacts);
+
+      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      const wsUrl = `${protocol}://${window.location.hostname}:${bootstrap.wsPort}`;
+      console.log("[dashboard] Bootstrap route: /api/events/bootstrap");
+      console.log("[dashboard] Manual AI route: /api/events/news");
+      console.log("[dashboard] WebSocket route:", wsUrl);
+      socket = new WebSocket(wsUrl);
+
+      socket.onmessage = (message) => {
+        const packet = JSON.parse(message.data as string) as StreamPacket;
+
+        if (packet.type === "bootstrap") {
+          setEvents(packet.payload.events);
+          setImpacts(packet.payload.impacts);
+          const aiCount = packet.payload.events.filter((event) => event.source === "openrouter").length;
+          console.log("[dashboard] Bootstrap received. OpenRouter events:", aiCount);
+        } else if (packet.type === "event") {
+          setEvents((previous) => [packet.payload.event, ...previous].slice(0, 1500));
+          setImpacts(packet.payload.impacts);
+          if (packet.payload.event.source === "openrouter") {
+            console.log("🧠 [OpenRouter AI Event]", packet.payload.event);
+          }
+        }
+      };
+    };
+
+    void connect();
+
+    return () => {
+      if (socket) {
+        socket.close();
+      }
+    };
+  }, []);
+
+  const trustedAiEvents = useMemo(
+    () => events.filter((event) => event.source === "openrouter" && event.verification === "trusted"),
+    [events],
+  );
+
+  const rangeStart = useMemo(() => {
+    if (dateRange === "all") {
+      return null;
+    }
+
+    const now = new Date();
+    if (dateRange === "today") {
+      const dayStart = new Date(now);
+      dayStart.setHours(0, 0, 0, 0);
+      return dayStart;
+    }
+
+    const days = dateRange === "7d" ? 7 : 30;
+    return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  }, [dateRange]);
+
+  const rangeEvents = useMemo(
+    () =>
+      trustedAiEvents.filter((event) => {
+        if (!rangeStart) {
+          return true;
+        }
+        return eventDateMs(event) >= rangeStart.getTime();
+      }),
+    [rangeStart, trustedAiEvents],
+  );
+
+  const aiOnlyStats = useMemo<ConflictStats>(() => {
+    const targetCounts = new Map<string, number>();
+    const attackerCounts = new Map<string, number>();
+    for (const event of rangeEvents) {
+      targetCounts.set(event.target, (targetCounts.get(event.target) ?? 0) + 1);
+      attackerCounts.set(event.attacker, (attackerCounts.get(event.attacker) ?? 0) + 1);
+    }
+
+    const pickTop = (counter: Map<string, number>) => {
+      let winner = "N/A";
+      let max = 0;
+      for (const [name, count] of counter.entries()) {
+        if (count > max) {
+          winner = name;
+          max = count;
+        }
+      }
+      return winner;
+    };
+
+    const attackRate = rangeEvents.length;
+    return {
+      totalAttacksToday: rangeEvents.length,
+      mostTargetedCountry: pickTop(targetCounts),
+      mostActiveAttacker: pickTop(attackerCounts),
+      globalAlertLevel:
+        attackRate > 160 ? "CRITICAL" : attackRate > 110 ? "HIGH" : attackRate > 50 ? "ELEVATED" : "LOW",
+    };
+  }, [rangeEvents]);
+
+  const filteredEvents = useMemo(() => {
+    return rangeEvents.filter((event) => {
+      const countryMatch =
+        !selectedCountry || event.attacker === selectedCountry || event.target === selectedCountry;
+      const typeMatch = activeTypes.includes(event.attackType);
+      return countryMatch && typeMatch;
+    });
+  }, [activeTypes, rangeEvents, selectedCountry]);
+
+  const filteredImpacts = useMemo(() => {
+    const allowed = new Set(filteredEvents.map((event) => event.id));
+    return impacts.filter((impact) => allowed.has(impact.eventId));
+  }, [filteredEvents, impacts]);
+
+  const toggleAttackType = (type: AttackType) => {
+    setActiveTypes((previous) => {
+      if (previous.includes(type)) {
+        const next = previous.filter((entry) => entry !== type);
+        return next.length > 0 ? next : previous;
+      }
+      return [...previous, type];
+    });
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="war-room-bg min-h-screen p-3 text-slate-100 sm:p-4 lg:p-6">
+      <div className="mx-auto grid max-w-[1500px] gap-3 sm:gap-4">
+        <StatsPanel
+          stats={aiOnlyStats ?? DEFAULT_STATS}
+          selectedCountry={selectedCountry}
+          activeTypes={activeTypes}
+          dateRange={dateRange}
+          onCountryReset={() => setSelectedCountry(null)}
+          onToggleType={toggleAttackType}
+          onDateRangeChange={setDateRange}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+
+        <div className="grid gap-3 sm:gap-4 lg:min-h-[78vh] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <GlobeMap
+            events={filteredEvents}
+            impacts={filteredImpacts}
+            selectedCountry={selectedCountry}
+            onCountrySelect={setSelectedCountry}
+          />
+          <EventFeed events={filteredEvents.slice(0, 120)} />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

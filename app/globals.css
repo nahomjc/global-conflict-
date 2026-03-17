@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #020617;
+  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -14,13 +14,50 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #020617;
+    --foreground: #e2e8f0;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.war-room-bg {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(34, 211, 238, 0.2), transparent 28%),
+    radial-gradient(circle at 80% 80%, rgba(244, 63, 94, 0.15), transparent 32%),
+    linear-gradient(180deg, #020617, #020817 45%, #04091d 100%);
+  position: relative;
+}
+
+.war-room-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 70% 10%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 40% 85%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 85% 50%, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(1px 1px at 10% 75%, rgba(255, 255, 255, 0.25), transparent);
+  opacity: 0.6;
+}
+
+.radar-overlay {
+  background: conic-gradient(from 120deg, rgba(34, 211, 238, 0) 0deg, rgba(34, 211, 238, 0.12) 90deg, rgba(34, 211, 238, 0) 180deg);
+  mix-blend-mode: screen;
+  animation: radar-spin 12s linear infinite;
+}
+
+@keyframes radar-spin {
+  from {
+    transform: rotate(0deg) scale(1.1);
+  }
+  to {
+    transform: rotate(360deg) scale(1.1);
+  }
 }
