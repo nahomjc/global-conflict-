@@ -16,6 +16,23 @@ type StreamPacket =
       payload: { event: ConflictEvent; impacts: ImpactPulse[]; stats: ConflictStats };
     };
 
+type BootstrapResponse = {
+  realtimeMode: "ws" | "poll";
+  wsPort: number | null;
+  events: ConflictEvent[];
+  impacts: ImpactPulse[];
+  stats: ConflictStats;
+};
+
+type NewsPollResponse = {
+  ok: boolean;
+  trustedHeadlines: number;
+  extracted: number;
+  events: ConflictEvent[];
+  impacts: ImpactPulse[];
+  stats: ConflictStats;
+};
+
 const DEFAULT_STATS: ConflictStats = {
   totalAttacksToday: 0,
   mostTargetedCountry: "N/A",
@@ -41,42 +58,82 @@ export default function Home() {
 
   useEffect(() => {
     let socket: WebSocket | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const dedupeByIncident = (items: ConflictEvent[]) => {
+      const map = new Map<string, ConflictEvent>();
+      for (const item of items) {
+        const key = [
+          item.sourceUrl ?? "",
+          item.sourceHeadline ?? "",
+          item.sourcePublishedAt ?? "",
+          item.attacker ?? "",
+          item.target ?? "",
+          item.attackType ?? "",
+        ]
+          .join("|")
+          .toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, item);
+        }
+      }
+      return Array.from(map.values());
+    };
+
+    const pollNews = async () => {
+      try {
+        const response = await fetch("/api/events/news", { method: "POST" });
+        const payload = (await response.json()) as NewsPollResponse;
+        if (!payload.ok) {
+          return;
+        }
+
+        setEvents((previous) => dedupeByIncident([...payload.events, ...previous]).slice(0, 1500));
+        setImpacts(payload.impacts);
+      } catch (error) {
+        console.error("[dashboard] Polling /api/events/news failed", error);
+      }
+    };
 
     const connect = async () => {
       const response = await fetch("/api/events/bootstrap");
-      const bootstrap = (await response.json()) as {
-        wsPort: number;
-        events: ConflictEvent[];
-        impacts: ImpactPulse[];
-        stats: ConflictStats;
-      };
+      const bootstrap = (await response.json()) as BootstrapResponse;
 
       setEvents(bootstrap.events);
       setImpacts(bootstrap.impacts);
 
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      const wsUrl = `${protocol}://${window.location.hostname}:${bootstrap.wsPort}`;
       console.log("[dashboard] Bootstrap route: /api/events/bootstrap");
       console.log("[dashboard] Manual AI route: /api/events/news");
-      console.log("[dashboard] WebSocket route:", wsUrl);
-      socket = new WebSocket(wsUrl);
+      console.log("[dashboard] Realtime mode:", bootstrap.realtimeMode);
 
-      socket.onmessage = (message) => {
-        const packet = JSON.parse(message.data as string) as StreamPacket;
+      if (bootstrap.realtimeMode === "ws" && bootstrap.wsPort) {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${protocol}://${window.location.hostname}:${bootstrap.wsPort}`;
+        console.log("[dashboard] WebSocket route:", wsUrl);
+        socket = new WebSocket(wsUrl);
 
-        if (packet.type === "bootstrap") {
-          setEvents(packet.payload.events);
-          setImpacts(packet.payload.impacts);
-          const aiCount = packet.payload.events.filter((event) => event.source === "openrouter").length;
-          console.log("[dashboard] Bootstrap received. OpenRouter events:", aiCount);
-        } else if (packet.type === "event") {
-          setEvents((previous) => [packet.payload.event, ...previous].slice(0, 1500));
-          setImpacts(packet.payload.impacts);
-          if (packet.payload.event.source === "openrouter") {
-            console.log("🧠 [OpenRouter AI Event]", packet.payload.event);
+        socket.onmessage = (message) => {
+          const packet = JSON.parse(message.data as string) as StreamPacket;
+
+          if (packet.type === "bootstrap") {
+            setEvents(packet.payload.events);
+            setImpacts(packet.payload.impacts);
+            const aiCount = packet.payload.events.filter((event) => event.source === "openrouter").length;
+            console.log("[dashboard] Bootstrap received. OpenRouter events:", aiCount);
+          } else if (packet.type === "event") {
+            setEvents((previous) => [packet.payload.event, ...previous].slice(0, 1500));
+            setImpacts(packet.payload.impacts);
+            if (packet.payload.event.source === "openrouter") {
+              console.log("🧠 [OpenRouter AI Event]", packet.payload.event);
+            }
           }
-        }
-      };
+        };
+      } else {
+        await pollNews();
+        pollTimer = setInterval(() => {
+          void pollNews();
+        }, 45_000);
+      }
     };
 
     void connect();
@@ -84,6 +141,9 @@ export default function Home() {
     return () => {
       if (socket) {
         socket.close();
+      }
+      if (pollTimer) {
+        clearInterval(pollTimer);
       }
     };
   }, []);

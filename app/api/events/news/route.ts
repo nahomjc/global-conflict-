@@ -29,6 +29,8 @@ export async function POST() {
     ok: true,
     trustedHeadlines: trustedItems.length,
     extracted: events.length,
+    events,
+    impacts: eventStore.getImpacts(),
     stats: eventStore.getStats(),
   });
 }

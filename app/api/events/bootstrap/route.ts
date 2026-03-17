@@ -5,10 +5,14 @@ import { ensureWebSocketServer, getWsPort } from "@/lib/websocket-server";
 export const runtime = "nodejs";
 
 export async function GET() {
-  ensureWebSocketServer();
+  const realtimeMode = process.env.VERCEL ? "poll" : "ws";
+  if (realtimeMode === "ws") {
+    ensureWebSocketServer();
+  }
 
   return NextResponse.json({
-    wsPort: getWsPort(),
+    realtimeMode,
+    wsPort: realtimeMode === "ws" ? getWsPort() : null,
     events: eventStore.getEvents(),
     impacts: eventStore.getImpacts(),
     stats: eventStore.getStats(),
