@@ -105,6 +105,11 @@ function eventDateMs(event: ConflictEvent) {
   return Number.isNaN(ingestMs) ? 0 : ingestMs;
 }
 
+function eventIngestMs(event: ConflictEvent) {
+  const ingestMs = Date.parse(event.timestamp);
+  return Number.isNaN(ingestMs) ? 0 : ingestMs;
+}
+
 function normalizeCountryName(value: string) {
   return value
     .toLowerCase()
@@ -394,7 +399,7 @@ export default function Home() {
         if (!rangeStart) {
           return true;
         }
-        return eventDateMs(event) >= rangeStart.getTime();
+        return eventIngestMs(event) >= rangeStart.getTime();
       }),
     [rangeStart, trustedAiEvents],
   );
