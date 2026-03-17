@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { EventFeed } from "@/components/EventFeed";
 import { GlobeMap } from "@/components/GlobeMap";
+import { IntroLoader } from "@/components/IntroLoader";
 import { StatsPanel, type DateRangeFilter } from "@/components/StatsPanel";
 import type { AttackType, ConflictEvent, ConflictStats, ImpactPulse } from "@/lib/conflict-types";
 
@@ -50,11 +51,17 @@ function eventDateMs(event: ConflictEvent) {
 }
 
 export default function Home() {
+  const [showIntroLoader, setShowIntroLoader] = useState(true);
   const [events, setEvents] = useState<ConflictEvent[]>([]);
   const [impacts, setImpacts] = useState<ImpactPulse[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [activeTypes, setActiveTypes] = useState<AttackType[]>(["missile", "drone", "airstrike"]);
   const [dateRange, setDateRange] = useState<DateRangeFilter>("today");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowIntroLoader(false), 2400);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -236,6 +243,7 @@ export default function Home() {
 
   return (
     <div className="war-room-bg min-h-screen p-3 text-slate-100 sm:p-4 lg:p-6">
+      <IntroLoader visible={showIntroLoader} />
       <div className="mx-auto grid max-w-[1500px] gap-3 sm:gap-4">
         <StatsPanel
           stats={aiOnlyStats ?? DEFAULT_STATS}
