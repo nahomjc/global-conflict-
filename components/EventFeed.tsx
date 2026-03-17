@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import type { ConflictEvent } from "@/lib/conflict-types";
+import { CountryNameWithFlag } from "@/components/CountryNameWithFlag";
 
 interface EventFeedProps {
   events: ConflictEvent[];
@@ -48,7 +49,8 @@ export function EventFeed({ events, waitingForAiResponse = false }: EventFeedPro
               Waiting for incoming events...
             </motion.article>
           ) : null}
-          {events.map((event) => (
+          {events.map((event) => {
+            return (
             <motion.article
               key={event.id}
               layout
@@ -58,7 +60,9 @@ export function EventFeed({ events, waitingForAiResponse = false }: EventFeedPro
               className="rounded-xl border border-slate-700/50 bg-slate-900/75 p-3 text-xs"
             >
               <p className="font-medium text-cyan-100">
-                {event.attacker} <span className="text-slate-500">-&gt;</span> {event.target}
+                <CountryNameWithFlag country={event.attacker} />{" "}
+                <span className="text-slate-500">-&gt;</span>{" "}
+                <CountryNameWithFlag country={event.target} />
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <p className="text-[11px] tracking-wide text-red-300 uppercase">{event.attackType}</p>
@@ -92,7 +96,8 @@ export function EventFeed({ events, waitingForAiResponse = false }: EventFeedPro
                 </p>
               ) : null}
             </motion.article>
-          ))}
+            );
+          })}
         </AnimatePresence>
       </div>
     </aside>

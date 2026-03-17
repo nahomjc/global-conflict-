@@ -187,14 +187,72 @@ export function GlobeMap({
   );
 
   const radarRing = useMemo(() => [{ lat: 18, lng: -20, maxR: 18 }], []);
+  const selectedCountryInsights = useMemo(() => {
+    if (!selectedCountry) {
+      return { targeted: 0, outgoing: 0 };
+    }
+    let targeted = 0;
+    let outgoing = 0;
+    for (const event of events) {
+      if (event.target === selectedCountry) {
+        targeted += 1;
+      }
+      if (event.attacker === selectedCountry) {
+        outgoing += 1;
+      }
+    }
+    return { targeted, outgoing };
+  }, [events, selectedCountry]);
+
+  const selectedCountryRings = useMemo(
+    () =>
+      selectedCountry
+        ? events
+            .filter(
+              (event) =>
+                event.target === selectedCountry || event.attacker === selectedCountry,
+            )
+            .slice(0, 12)
+            .map((event) => ({
+              lat: event.endLat,
+              lng: event.endLng,
+              maxR: 16,
+              selectedCountryFocus: true,
+            }))
+        : [],
+    [events, selectedCountry],
+  );
 
   return (
     <div
       ref={containerRef}
-      className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-950/70 sm:min-h-[500px] lg:min-h-0"
+      className={`relative h-full min-h-[420px] overflow-hidden rounded-2xl border bg-slate-950/70 sm:min-h-[500px] lg:min-h-0 ${
+        selectedCountry
+          ? "country-focus-glow border-cyan-300/70"
+          : "border-cyan-500/30"
+      }`}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.12),transparent_38%),radial-gradient(circle_at_70%_80%,rgba(244,63,94,0.14),transparent_35%)]" />
       <div className="radar-overlay pointer-events-none absolute inset-0 z-10" />
+      {selectedCountry ? (
+        <div className="absolute top-3 left-3 z-20 rounded-xl border border-cyan-300/45 bg-slate-950/85 px-3 py-2 text-[11px] shadow-[0_0_24px_rgba(56,189,248,0.35)] backdrop-blur">
+          <p className="tracking-[0.14em] text-cyan-100 uppercase">
+            Focus: {selectedCountry}
+          </p>
+          <p className="mt-1 text-slate-300">
+            Incoming attacks:{" "}
+            <span className="font-semibold text-red-300">
+              {selectedCountryInsights.targeted}
+            </span>
+          </p>
+          <p className="text-slate-300">
+            Outgoing attacks:{" "}
+            <span className="font-semibold text-amber-300">
+              {selectedCountryInsights.outgoing}
+            </span>
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex h-full w-full items-center justify-center">
         {webglReady === false ? (
@@ -222,12 +280,24 @@ export function GlobeMap({
               const name =
                 polygon.properties?.NAME ?? polygon.properties?.name ?? "";
               if (selectedCountry && selectedCountry === name) {
-                return "rgba(56, 189, 248, 0.45)";
+                return "rgba(34, 211, 238, 0.68)";
               }
               return "rgba(59, 130, 246, 0.08)";
             }}
-            polygonSideColor={() => "rgba(2, 132, 199, 0.08)"}
-            polygonStrokeColor={() => "rgba(56, 189, 248, 0.3)"}
+            polygonSideColor={(polygon: CountryPolygon) => {
+              const name =
+                polygon.properties?.NAME ?? polygon.properties?.name ?? "";
+              return selectedCountry && selectedCountry === name
+                ? "rgba(34, 211, 238, 0.22)"
+                : "rgba(2, 132, 199, 0.08)";
+            }}
+            polygonStrokeColor={(polygon: CountryPolygon) => {
+              const name =
+                polygon.properties?.NAME ?? polygon.properties?.name ?? "";
+              return selectedCountry && selectedCountry === name
+                ? "rgba(103, 232, 249, 0.9)"
+                : "rgba(56, 189, 248, 0.3)";
+            }}
             polygonLabel={(polygon: CountryPolygon) =>
               polygon.properties?.NAME ?? polygon.properties?.name ?? "Unknown"
             }
@@ -260,18 +330,21 @@ export function GlobeMap({
             pointAltitude={(point: { size?: number }) => point.size ?? 0.04}
             pointRadius={(point: { size?: number }) => point.size ?? 0.08}
             pointsMerge
-            ringsData={[...impactPoints, ...radarRing]}
+            ringsData={[...impactPoints, ...selectedCountryRings, ...radarRing]}
             ringLat="lat"
             ringLng="lng"
-            ringColor={(ring: { color?: string }) => () =>
-              ring.color ?? "rgba(239, 68, 68, 0.7)"
+            ringColor={(ring: { color?: string; selectedCountryFocus?: boolean }) =>
+              () =>
+                ring.selectedCountryFocus
+                  ? "rgba(34, 211, 238, 0.88)"
+                  : ring.color ?? "rgba(239, 68, 68, 0.7)"
             }
             ringMaxRadius={(ring: { maxR?: number }) => ring.maxR ?? 8}
-            ringPropagationSpeed={(ring: { maxR?: number }) =>
-              ring.maxR ? 1.2 : 2.6
+            ringPropagationSpeed={(ring: { maxR?: number; selectedCountryFocus?: boolean }) =>
+              ring.selectedCountryFocus ? 1.9 : ring.maxR ? 1.2 : 2.6
             }
-            ringRepeatPeriod={(ring: { maxR?: number }) =>
-              ring.maxR ? 900 : 1300
+            ringRepeatPeriod={(ring: { maxR?: number; selectedCountryFocus?: boolean }) =>
+              ring.selectedCountryFocus ? 760 : ring.maxR ? 900 : 1300
             }
             hexBinPointsData={heatPoints}
             hexBinPointLat="lat"

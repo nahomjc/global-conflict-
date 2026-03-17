@@ -1,7 +1,9 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import type { AttackType, ConflictStats } from "@/lib/conflict-types";
+import { CountryNameWithFlag } from "@/components/CountryNameWithFlag";
 
 export type DateRangeFilter = "today" | "7d" | "30d" | "all";
 
@@ -40,7 +42,6 @@ export function StatsPanel({
         : stats.globalAlertLevel === "ELEVATED"
           ? "text-yellow-300"
           : "text-emerald-300";
-
   return (
     <motion.div
       initial={{ y: -14, opacity: 0 }}
@@ -49,8 +50,14 @@ export function StatsPanel({
     >
       <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
         <StatCard title="Total Attacks (Range)" value={String(stats.totalAttacksToday)} />
-        <StatCard title="Most Targeted" value={stats.mostTargetedCountry} />
-        <StatCard title="Most Active Attacker" value={stats.mostActiveAttacker} />
+        <StatCard
+          title="Most Targeted"
+          value={<CountryNameWithFlag country={stats.mostTargetedCountry} />}
+        />
+        <StatCard
+          title="Most Active Attacker"
+          value={<CountryNameWithFlag country={stats.mostActiveAttacker} />}
+        />
         <StatCard title="Global Alert" value={stats.globalAlertLevel} valueClassName={alertColor} />
       </div>
 
@@ -61,6 +68,7 @@ export function StatsPanel({
             return (
               <button
                 key={range.id}
+                type="button"
                 onClick={() => onDateRangeChange(range.id)}
                 className={`shrink-0 rounded-full border px-3 py-1 tracking-wide whitespace-nowrap transition ${
                   selected
@@ -80,6 +88,7 @@ export function StatsPanel({
             return (
               <button
                 key={type}
+                type="button"
                 onClick={() => onToggleType(type)}
                 className={`shrink-0 rounded-full border px-3 py-1 tracking-wider uppercase whitespace-nowrap transition ${
                   enabled
@@ -93,10 +102,12 @@ export function StatsPanel({
           })}
           {selectedCountry && (
             <button
+              type="button"
               onClick={onCountryReset}
               className="shrink-0 rounded-full border border-red-400/40 bg-red-500/10 px-3 py-1 text-red-200 whitespace-nowrap"
             >
-              Clear country filter: {selectedCountry}
+              Clear country filter:{" "}
+              <CountryNameWithFlag country={selectedCountry} />
             </button>
           )}
         </div>
@@ -111,7 +122,7 @@ function StatCard({
   valueClassName,
 }: {
   title: string;
-  value: string;
+  value: ReactNode;
   valueClassName?: string;
 }) {
   return (

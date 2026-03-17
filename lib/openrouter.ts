@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import type { ConflictEvent } from "@/lib/conflict-types";
 import type { NewsItem } from "@/lib/news";
 
@@ -7,6 +7,37 @@ const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
 
 function normalize(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+const GENERIC_ACTORS = new Set([
+  "unknown",
+  "various",
+  "multiple",
+  "middle east",
+  "region",
+  "global",
+  "n/a",
+  "na",
+]);
+
+function isSpecificActor(value: string) {
+  const normalized = normalize(value);
+  if (!normalized) {
+    return false;
+  }
+  if (GENERIC_ACTORS.has(normalized)) {
+    return false;
+  }
+  // Reject broad/non-country composites such as "various forces / middle east".
+  if (
+    normalized.includes("various ") ||
+    normalized.includes("multiple ") ||
+    normalized.includes(" region") ||
+    normalized.includes("middle east")
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function resolveTrustedTimestamp(newsItem: NewsItem) {
@@ -49,8 +80,10 @@ function sanitizeEvent(partial: Partial<ConflictEvent>, newsItem: NewsItem): Con
 
   const headline = normalize(newsItem.headline);
   const quote = normalize(String(partial.evidenceQuote));
-  const attacker = normalize(String(partial.attacker));
-  const target = normalize(String(partial.target));
+  const attackerRaw = String(partial.attacker);
+  const targetRaw = String(partial.target);
+  const attacker = normalize(attackerRaw);
+  const target = normalize(targetRaw);
 
   // Reject model output unless it can cite exact evidence from a trusted headline.
   if (!quote || !headline.includes(quote)) {
@@ -59,6 +92,16 @@ function sanitizeEvent(partial: Partial<ConflictEvent>, newsItem: NewsItem): Con
 
   // Force at least one actor to appear in the same trusted headline text.
   if (!headline.includes(attacker) && !headline.includes(target)) {
+    return null;
+  }
+
+  // Reject generic region-level or unknown actor/target outputs.
+  if (!isSpecificActor(attackerRaw) || !isSpecificActor(targetRaw)) {
+    return null;
+  }
+
+  // Disallow self-targeted events produced by ambiguous extraction.
+  if (attacker === target) {
     return null;
   }
 
@@ -94,11 +137,23 @@ function safeJsonParse(value: string): unknown {
   }
 }
 
-export async function extractConflictEventsFromNews(items: NewsItem[]): Promise<ConflictEvent[]> {
+export async function extractConflictEventsFromNews(
+  items: NewsItem[],
+  focusCountry?: string,
+  sinceYear?: number,
+): Promise<ConflictEvent[]> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey || items.length === 0) {
     return [];
   }
+
+  const focusInstruction = focusCountry
+    ? `- Prioritize events where attacker or target is "${focusCountry}" (including common aliases/abbreviations, e.g., USA/US/United States). If none exist, return an empty events array.`
+    : "";
+  const sinceInstruction =
+    typeof sinceYear === "number" && Number.isFinite(sinceYear)
+      ? `- Include only events dated ${sinceYear} or later; skip older incidents.`
+      : "";
 
   const prompt = `
 Extract conflict events from these trusted source headlines.
@@ -127,6 +182,8 @@ Rules:
 - Keep description under 120 chars.
 - sourceIndex must match the numbered list below.
 - evidenceQuote must be exact text from that headline.
+${focusInstruction}
+${sinceInstruction}
 
 TRUSTED HEADLINES:
 ${items

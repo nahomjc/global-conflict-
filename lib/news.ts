@@ -8,6 +8,12 @@ const CONFLICT_KEYWORDS = [
   "military",
   "shelling",
   "war",
+  "clash",
+  "offensive",
+  "raid",
+  "violence",
+  "bomb",
+  "artillery",
 ];
 
 const TRUSTED_PUBLISHERS = new Set([
@@ -122,6 +128,26 @@ function isRecentPublishedAt(publishedAt: string) {
   return Date.now() - ms <= RECENT_WINDOW_MS;
 }
 
+function isWithinSinceYear(publishedAt: string, sinceYear: number) {
+  const ms = Date.parse(publishedAt);
+  if (Number.isNaN(ms)) {
+    return true;
+  }
+  return ms >= Date.UTC(sinceYear, 0, 1);
+}
+
+function countrySearchFeeds(country: string, sinceYear?: number) {
+  const dateFilter = typeof sinceYear === "number" ? ` after:${sinceYear}-01-01` : "";
+  const queries = [
+    `"${country}" (missile OR drone OR airstrike OR strike OR attack OR conflict OR war)${dateFilter}`,
+    `"${country}" (military OR clashes OR offensive OR shelling OR bomb OR artillery)${dateFilter}`,
+  ];
+  return queries.map(
+    (query) =>
+      `https://news.google.com/rss/search?q=${encodeURIComponent(query.trim())}&hl=en-US&gl=US&ceid=US:en`,
+  );
+}
+
 async function pullFromFeed(feedUrl: string): Promise<NewsItem[]> {
   try {
     const response = await fetch(feedUrl, { next: { revalidate: 600 } });
@@ -159,13 +185,38 @@ async function pullFromFeed(feedUrl: string): Promise<NewsItem[]> {
   }
 }
 
-export async function fetchTrustedConflictNews(limit = 12): Promise<NewsItem[]> {
+type FetchTrustedNewsOptions = {
+  limit?: number;
+  sinceYear?: number;
+  country?: string;
+  includeUntrusted?: boolean;
+};
+
+export async function fetchTrustedConflictNews(
+  optionsOrLimit: number | FetchTrustedNewsOptions = 12,
+): Promise<NewsItem[]> {
+  const options: FetchTrustedNewsOptions =
+    typeof optionsOrLimit === "number"
+      ? { limit: optionsOrLimit }
+      : optionsOrLimit;
+  const limit = options.limit ?? 12;
+  const sinceYear = options.sinceYear;
+  const country = options.country?.trim();
+  const includeUntrusted = options.includeUntrusted ?? false;
+
+  const feedUrls = country
+    ? [...countrySearchFeeds(country, sinceYear), ...NEWS_FEEDS]
+    : NEWS_FEEDS;
   const merged = new Map<string, NewsItem>();
 
-  for (const feedUrl of NEWS_FEEDS) {
+  for (const feedUrl of feedUrls) {
     const items = await pullFromFeed(feedUrl);
     for (const item of items) {
-      if (item.trusted && isRecentPublishedAt(item.publishedAt)) {
+      const inRange =
+        typeof sinceYear === "number"
+          ? isWithinSinceYear(item.publishedAt, sinceYear)
+          : isRecentPublishedAt(item.publishedAt);
+      if ((item.trusted || includeUntrusted) && inRange) {
         merged.set(item.url, item);
       }
     }

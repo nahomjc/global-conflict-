@@ -31,6 +31,16 @@ export function IntroLoader({ visible }: IntroLoaderProps) {
               Strategic Intelligence Grid
             </h1>
 
+            <blockquote className="mt-4 rounded-xl border border-cyan-400/25 bg-slate-950/55 px-3 py-2 text-center text-[11px] leading-relaxed text-slate-200 sm:text-xs">
+              <p className="italic">
+                "You will hear of wars and rumors of wars... Nation will rise
+                against nation, and kingdom against kingdom."
+              </p>
+              <footer className="mt-1 tracking-[0.14em] text-cyan-200 uppercase">
+                Matthew 24:6-7
+              </footer>
+            </blockquote>
+
             <div className="mt-5 h-2 overflow-hidden rounded-full border border-cyan-400/35 bg-slate-950/80 sm:mt-6">
               <motion.div
                 className="h-full w-[40%] bg-gradient-to-r from-cyan-300 via-cyan-500 to-blue-400"
