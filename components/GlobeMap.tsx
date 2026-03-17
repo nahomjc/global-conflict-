@@ -67,6 +67,18 @@ export function GlobeMap({
   const [countries, setCountries] = useState<CountryPolygon[]>([]);
   const [satellites, setSatellites] = useState<SatellitePoint[]>([]);
 
+  const webglReady = useMemo<boolean | null>(() => {
+    if (typeof document === "undefined") {
+      return null;
+    }
+    const canvas = document.createElement("canvas");
+    return Boolean(
+      canvas.getContext("webgl2", { powerPreference: "low-power" }) ||
+        canvas.getContext("webgl", { powerPreference: "low-power" }) ||
+        canvas.getContext("experimental-webgl"),
+    );
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
@@ -74,8 +86,8 @@ export function GlobeMap({
     }
 
     const updateSize = () => {
-      const width = Math.max(300, Math.floor(container.clientWidth));
-      const height = Math.max(420, Math.floor(container.clientHeight));
+      const width = Math.max(300, Math.min(1200, Math.floor(container.clientWidth)));
+      const height = Math.max(360, Math.min(780, Math.floor(container.clientHeight)));
       setGlobeSize({ width, height });
     };
 
@@ -185,81 +197,92 @@ export function GlobeMap({
       <div className="radar-overlay pointer-events-none absolute inset-0 z-10" />
 
       <div className="flex h-full w-full items-center justify-center">
-        <Globe
-          ref={globeRef}
-          width={globeSize.width}
-          height={globeSize.height}
-          backgroundColor="rgba(2, 6, 23, 0.9)"
-          globeImageUrl={EARTH_DAY_TEXTURE}
-          bumpImageUrl={EARTH_BUMP_TEXTURE}
-          showAtmosphere
-          atmosphereColor="#60a5fa"
-          atmosphereAltitude={0.18}
-          polygonsData={countries}
-          polygonCapColor={(polygon: CountryPolygon) => {
-            const name =
-              polygon.properties?.NAME ?? polygon.properties?.name ?? "";
-            if (selectedCountry && selectedCountry === name) {
-              return "rgba(56, 189, 248, 0.45)";
+        {webglReady === false ? (
+          <div className="mx-4 w-full max-w-md rounded-xl border border-cyan-500/30 bg-slate-900/80 p-4 text-sm text-slate-200">
+            <p className="font-semibold text-cyan-200">3D Globe Unavailable</p>
+            <p className="mt-2 text-slate-300">
+              This device/browser could not create a WebGL context. Try reducing open tabs, disabling battery saver,
+              or using a different browser.
+            </p>
+          </div>
+        ) : (
+          <Globe
+            ref={globeRef}
+            width={globeSize.width}
+            height={globeSize.height}
+            rendererConfig={{ antialias: false, powerPreference: "low-power", precision: "mediump" }}
+            backgroundColor="rgba(2, 6, 23, 0.9)"
+            globeImageUrl={EARTH_DAY_TEXTURE}
+            bumpImageUrl={EARTH_BUMP_TEXTURE}
+            showAtmosphere
+            atmosphereColor="#60a5fa"
+            atmosphereAltitude={0.18}
+            polygonsData={countries}
+            polygonCapColor={(polygon: CountryPolygon) => {
+              const name =
+                polygon.properties?.NAME ?? polygon.properties?.name ?? "";
+              if (selectedCountry && selectedCountry === name) {
+                return "rgba(56, 189, 248, 0.45)";
+              }
+              return "rgba(59, 130, 246, 0.08)";
+            }}
+            polygonSideColor={() => "rgba(2, 132, 199, 0.08)"}
+            polygonStrokeColor={() => "rgba(56, 189, 248, 0.3)"}
+            polygonLabel={(polygon: CountryPolygon) =>
+              polygon.properties?.NAME ?? polygon.properties?.name ?? "Unknown"
             }
-            return "rgba(59, 130, 246, 0.08)";
-          }}
-          polygonSideColor={() => "rgba(2, 132, 199, 0.08)"}
-          polygonStrokeColor={() => "rgba(56, 189, 248, 0.3)"}
-          polygonLabel={(polygon: CountryPolygon) =>
-            polygon.properties?.NAME ?? polygon.properties?.name ?? "Unknown"
-          }
-          onPolygonClick={(polygon: CountryPolygon) =>
-            onCountrySelect(
-              polygon.properties?.NAME ?? polygon.properties?.name ?? null,
-            )
-          }
-          arcsData={arcsData}
-          arcStartLat="startLat"
-          arcStartLng="startLng"
-          arcEndLat="endLat"
-          arcEndLng="endLng"
-          arcColor="color"
-          arcAltitude={(arc: { attackType: string }) =>
-            arc.attackType === "missile" ? 0.31 : 0.18
-          }
-          arcStroke={0.55}
-          arcDashLength={0.32}
-          arcDashGap={0.62}
-          arcDashInitialGap={() => Math.random()}
-          arcDashAnimateTime={1300}
-          arcLabel={(event: ConflictEvent) =>
-            `<b>${event.attacker}</b> -> <b>${event.target}</b><br/>${event.attackType}<br/>${event.description}`
-          }
-          pointsData={[...impactPoints, ...satellites]}
-          pointLat="lat"
-          pointLng="lng"
-          pointColor={(point: { color?: string }) => point.color ?? "#93c5fd"}
-          pointAltitude={(point: { size?: number }) => point.size ?? 0.04}
-          pointRadius={(point: { size?: number }) => point.size ?? 0.08}
-          pointsMerge
-          ringsData={[...impactPoints, ...radarRing]}
-          ringLat="lat"
-          ringLng="lng"
-          ringColor={(ring: { color?: string }) => () =>
-            ring.color ?? "rgba(239, 68, 68, 0.7)"
-          }
-          ringMaxRadius={(ring: { maxR?: number }) => ring.maxR ?? 8}
-          ringPropagationSpeed={(ring: { maxR?: number }) =>
-            ring.maxR ? 1.2 : 2.6
-          }
-          ringRepeatPeriod={(ring: { maxR?: number }) =>
-            ring.maxR ? 900 : 1300
-          }
-          hexBinPointsData={heatPoints}
-          hexBinPointLat="lat"
-          hexBinPointLng="lng"
-          hexBinPointWeight="weight"
-          hexAltitude={0.025}
-          hexTopColor={() => "rgba(248, 113, 113, 0.58)"}
-          hexSideColor={() => "rgba(248, 113, 113, 0.15)"}
-          hexBinResolution={3}
-        />
+            onPolygonClick={(polygon: CountryPolygon) =>
+              onCountrySelect(
+                polygon.properties?.NAME ?? polygon.properties?.name ?? null,
+              )
+            }
+            arcsData={arcsData}
+            arcStartLat="startLat"
+            arcStartLng="startLng"
+            arcEndLat="endLat"
+            arcEndLng="endLng"
+            arcColor="color"
+            arcAltitude={(arc: { attackType: string }) =>
+              arc.attackType === "missile" ? 0.31 : 0.18
+            }
+            arcStroke={0.55}
+            arcDashLength={0.32}
+            arcDashGap={0.62}
+            arcDashInitialGap={() => Math.random()}
+            arcDashAnimateTime={1300}
+            arcLabel={(event: ConflictEvent) =>
+              `<b>${event.attacker}</b> -> <b>${event.target}</b><br/>${event.attackType}<br/>${event.description}`
+            }
+            pointsData={[...impactPoints, ...satellites]}
+            pointLat="lat"
+            pointLng="lng"
+            pointColor={(point: { color?: string }) => point.color ?? "#93c5fd"}
+            pointAltitude={(point: { size?: number }) => point.size ?? 0.04}
+            pointRadius={(point: { size?: number }) => point.size ?? 0.08}
+            pointsMerge
+            ringsData={[...impactPoints, ...radarRing]}
+            ringLat="lat"
+            ringLng="lng"
+            ringColor={(ring: { color?: string }) => () =>
+              ring.color ?? "rgba(239, 68, 68, 0.7)"
+            }
+            ringMaxRadius={(ring: { maxR?: number }) => ring.maxR ?? 8}
+            ringPropagationSpeed={(ring: { maxR?: number }) =>
+              ring.maxR ? 1.2 : 2.6
+            }
+            ringRepeatPeriod={(ring: { maxR?: number }) =>
+              ring.maxR ? 900 : 1300
+            }
+            hexBinPointsData={heatPoints}
+            hexBinPointLat="lat"
+            hexBinPointLng="lng"
+            hexBinPointWeight="weight"
+            hexAltitude={0.025}
+            hexTopColor={() => "rgba(248, 113, 113, 0.58)"}
+            hexSideColor={() => "rgba(248, 113, 113, 0.15)"}
+            hexBinResolution={3}
+          />
+        )}
       </div>
     </div>
   );
