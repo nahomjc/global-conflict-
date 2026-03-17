@@ -5,14 +5,15 @@ import type { ConflictEvent } from "@/lib/conflict-types";
 
 interface EventFeedProps {
   events: ConflictEvent[];
+  waitingForAiResponse?: boolean;
 }
 
-export function EventFeed({ events }: EventFeedProps) {
+export function EventFeed({ events, waitingForAiResponse = false }: EventFeedProps) {
   const aiCount = events.filter((event) => event.source === "openrouter").length;
   const trustedCount = events.filter((event) => event.verification === "trusted").length;
 
   return (
-    <aside className="rounded-2xl border border-cyan-500/30 bg-slate-950/75 p-3 backdrop-blur sm:p-4 lg:h-full">
+    <aside className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-950/75 p-3 backdrop-blur sm:p-4 lg:min-h-0">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xs font-semibold tracking-[0.2em] text-cyan-200 uppercase sm:text-sm">Live Event Feed</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -26,8 +27,27 @@ export function EventFeed({ events }: EventFeedProps) {
         </div>
       </div>
 
-      <div className="scrollbar-thin max-h-[46vh] space-y-2 overflow-y-auto pr-1 lg:h-[calc(100%-2.25rem)] lg:max-h-none">
+      {waitingForAiResponse ? (
+        <div className="mb-3 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
+          <p className="font-semibold tracking-wide uppercase">AI response pending</p>
+          <p className="mt-1 text-amber-100/90">
+            AI will respond with the latest information shortly. Please wait...
+          </p>
+        </div>
+      ) : null}
+
+      <div className="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         <AnimatePresence initial={false}>
+          {events.length === 0 ? (
+            <motion.article
+              key="empty-feed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="rounded-xl border border-slate-700/50 bg-slate-900/75 p-3 text-xs text-slate-300"
+            >
+              Waiting for incoming events...
+            </motion.article>
+          ) : null}
           {events.map((event) => (
             <motion.article
               key={event.id}

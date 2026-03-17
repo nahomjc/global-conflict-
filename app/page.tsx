@@ -65,6 +65,7 @@ function eventDateMs(event: ConflictEvent) {
 
 export default function Home() {
   const [showIntroLoader, setShowIntroLoader] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [events, setEvents] = useState<ConflictEvent[]>([]);
   const [impacts, setImpacts] = useState<ImpactPulse[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -118,54 +119,62 @@ export default function Home() {
         setImpacts(payload.impacts);
       } catch (error) {
         console.error("[dashboard] Polling /api/events/news failed", error);
+      } finally {
+        setIsBootstrapping(false);
       }
     };
 
     const connect = async () => {
-      const response = await fetch("/api/events/bootstrap");
-      const bootstrap = (await response.json()) as BootstrapResponse;
+      try {
+        const response = await fetch("/api/events/bootstrap");
+        const bootstrap = (await response.json()) as BootstrapResponse;
 
-      setEvents(bootstrap.events);
-      setImpacts(bootstrap.impacts);
+        setEvents(bootstrap.events);
+        setImpacts(bootstrap.impacts);
 
-      console.log("[dashboard] Bootstrap route: /api/events/bootstrap");
-      console.log("[dashboard] Manual AI route: /api/events/news");
-      console.log("[dashboard] Realtime mode:", bootstrap.realtimeMode);
+        console.log("[dashboard] Bootstrap route: /api/events/bootstrap");
+        console.log("[dashboard] Manual AI route: /api/events/news");
+        console.log("[dashboard] Realtime mode:", bootstrap.realtimeMode);
 
-      if (bootstrap.realtimeMode === "ws" && bootstrap.wsPort) {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const wsUrl = `${protocol}://${window.location.hostname}:${bootstrap.wsPort}`;
-        console.log("[dashboard] WebSocket route:", wsUrl);
-        socket = new WebSocket(wsUrl);
+        if (bootstrap.realtimeMode === "ws" && bootstrap.wsPort) {
+          const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+          const wsUrl = `${protocol}://${window.location.hostname}:${bootstrap.wsPort}`;
+          console.log("[dashboard] WebSocket route:", wsUrl);
+          socket = new WebSocket(wsUrl);
 
-        socket.onmessage = (message) => {
-          const packet = JSON.parse(message.data as string) as StreamPacket;
+          socket.onmessage = (message) => {
+            const packet = JSON.parse(message.data as string) as StreamPacket;
 
-          if (packet.type === "bootstrap") {
-            setEvents(packet.payload.events);
-            setImpacts(packet.payload.impacts);
-            const aiCount = packet.payload.events.filter(
-              (event) => event.source === "openrouter",
-            ).length;
-            console.log(
-              "[dashboard] Bootstrap received. OpenRouter events:",
-              aiCount,
-            );
-          } else if (packet.type === "event") {
-            setEvents((previous) =>
-              [packet.payload.event, ...previous].slice(0, 1500),
-            );
-            setImpacts(packet.payload.impacts);
-            if (packet.payload.event.source === "openrouter") {
-              console.log("🧠 [OpenRouter AI Event]", packet.payload.event);
+            if (packet.type === "bootstrap") {
+              setEvents(packet.payload.events);
+              setImpacts(packet.payload.impacts);
+              const aiCount = packet.payload.events.filter(
+                (event) => event.source === "openrouter",
+              ).length;
+              console.log(
+                "[dashboard] Bootstrap received. OpenRouter events:",
+                aiCount,
+              );
+            } else if (packet.type === "event") {
+              setEvents((previous) =>
+                [packet.payload.event, ...previous].slice(0, 1500),
+              );
+              setImpacts(packet.payload.impacts);
+              if (packet.payload.event.source === "openrouter") {
+                console.log("🧠 [OpenRouter AI Event]", packet.payload.event);
+              }
             }
-          }
-        };
-      } else {
-        await pollNews();
-        pollTimer = setInterval(() => {
-          void pollNews();
-        }, 45_000);
+          };
+        } else {
+          await pollNews();
+          pollTimer = setInterval(() => {
+            void pollNews();
+          }, 45_000);
+        }
+      } catch (error) {
+        console.error("[dashboard] Bootstrap failed", error);
+      } finally {
+        setIsBootstrapping(false);
       }
     };
 
@@ -272,6 +281,13 @@ export default function Home() {
     return impacts.filter((impact) => allowed.has(impact.eventId));
   }, [filteredEvents, impacts]);
 
+  const waitingForAiResponse = useMemo(
+    () =>
+      !showIntroLoader &&
+      (isBootstrapping || trustedAiEvents.length === 0),
+    [isBootstrapping, showIntroLoader, trustedAiEvents.length],
+  );
+
   const toggleAttackType = (type: AttackType) => {
     setActiveTypes((previous) => {
       if (previous.includes(type)) {
@@ -296,8 +312,8 @@ export default function Home() {
           onDateRangeChange={setDateRange}
         />
 
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:min-h-[78vh] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:h-[78vh] lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 lg:h-full lg:min-h-0">
             <GlobeMap
               events={filteredEvents}
               impacts={filteredImpacts}
@@ -305,8 +321,11 @@ export default function Home() {
               onCountrySelect={setSelectedCountry}
             />
           </div>
-          <div className="min-w-0">
-            <EventFeed events={filteredEvents.slice(0, 120)} />
+          <div className="min-w-0 lg:h-full lg:min-h-0">
+            <EventFeed
+              events={filteredEvents.slice(0, 120)}
+              waitingForAiResponse={waitingForAiResponse}
+            />
           </div>
         </div>
       </div>

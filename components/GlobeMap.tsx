@@ -191,7 +191,7 @@ export function GlobeMap({
   return (
     <div
       ref={containerRef}
-      className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-950/70 sm:min-h-[500px] lg:min-h-[560px]"
+      className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-950/70 sm:min-h-[500px] lg:min-h-0"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.12),transparent_38%),radial-gradient(circle_at_70%_80%,rgba(244,63,94,0.14),transparent_35%)]" />
       <div className="radar-overlay pointer-events-none absolute inset-0 z-10" />
