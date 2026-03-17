@@ -5,16 +5,29 @@ import { EventFeed } from "@/components/EventFeed";
 import { GlobeMap } from "@/components/GlobeMap";
 import { IntroLoader } from "@/components/IntroLoader";
 import { StatsPanel, type DateRangeFilter } from "@/components/StatsPanel";
-import type { AttackType, ConflictEvent, ConflictStats, ImpactPulse } from "@/lib/conflict-types";
+import type {
+  AttackType,
+  ConflictEvent,
+  ConflictStats,
+  ImpactPulse,
+} from "@/lib/conflict-types";
 
 type StreamPacket =
   | {
       type: "bootstrap";
-      payload: { events: ConflictEvent[]; impacts: ImpactPulse[]; stats: ConflictStats };
+      payload: {
+        events: ConflictEvent[];
+        impacts: ImpactPulse[];
+        stats: ConflictStats;
+      };
     }
   | {
       type: "event";
-      payload: { event: ConflictEvent; impacts: ImpactPulse[]; stats: ConflictStats };
+      payload: {
+        event: ConflictEvent;
+        impacts: ImpactPulse[];
+        stats: ConflictStats;
+      };
     };
 
 type BootstrapResponse = {
@@ -55,7 +68,11 @@ export default function Home() {
   const [events, setEvents] = useState<ConflictEvent[]>([]);
   const [impacts, setImpacts] = useState<ImpactPulse[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const [activeTypes, setActiveTypes] = useState<AttackType[]>(["missile", "drone", "airstrike"]);
+  const [activeTypes, setActiveTypes] = useState<AttackType[]>([
+    "missile",
+    "drone",
+    "airstrike",
+  ]);
   const [dateRange, setDateRange] = useState<DateRangeFilter>("today");
 
   useEffect(() => {
@@ -95,7 +112,9 @@ export default function Home() {
           return;
         }
 
-        setEvents((previous) => dedupeByIncident([...payload.events, ...previous]).slice(0, 1500));
+        setEvents((previous) =>
+          dedupeByIncident([...payload.events, ...previous]).slice(0, 1500),
+        );
         setImpacts(payload.impacts);
       } catch (error) {
         console.error("[dashboard] Polling /api/events/news failed", error);
@@ -125,10 +144,17 @@ export default function Home() {
           if (packet.type === "bootstrap") {
             setEvents(packet.payload.events);
             setImpacts(packet.payload.impacts);
-            const aiCount = packet.payload.events.filter((event) => event.source === "openrouter").length;
-            console.log("[dashboard] Bootstrap received. OpenRouter events:", aiCount);
+            const aiCount = packet.payload.events.filter(
+              (event) => event.source === "openrouter",
+            ).length;
+            console.log(
+              "[dashboard] Bootstrap received. OpenRouter events:",
+              aiCount,
+            );
           } else if (packet.type === "event") {
-            setEvents((previous) => [packet.payload.event, ...previous].slice(0, 1500));
+            setEvents((previous) =>
+              [packet.payload.event, ...previous].slice(0, 1500),
+            );
             setImpacts(packet.payload.impacts);
             if (packet.payload.event.source === "openrouter") {
               console.log("🧠 [OpenRouter AI Event]", packet.payload.event);
@@ -156,7 +182,11 @@ export default function Home() {
   }, []);
 
   const trustedAiEvents = useMemo(
-    () => events.filter((event) => event.source === "openrouter" && event.verification === "trusted"),
+    () =>
+      events.filter(
+        (event) =>
+          event.source === "openrouter" && event.verification === "trusted",
+      ),
     [events],
   );
 
@@ -192,7 +222,10 @@ export default function Home() {
     const attackerCounts = new Map<string, number>();
     for (const event of rangeEvents) {
       targetCounts.set(event.target, (targetCounts.get(event.target) ?? 0) + 1);
-      attackerCounts.set(event.attacker, (attackerCounts.get(event.attacker) ?? 0) + 1);
+      attackerCounts.set(
+        event.attacker,
+        (attackerCounts.get(event.attacker) ?? 0) + 1,
+      );
     }
 
     const pickTop = (counter: Map<string, number>) => {
@@ -213,14 +246,22 @@ export default function Home() {
       mostTargetedCountry: pickTop(targetCounts),
       mostActiveAttacker: pickTop(attackerCounts),
       globalAlertLevel:
-        attackRate > 160 ? "CRITICAL" : attackRate > 110 ? "HIGH" : attackRate > 50 ? "ELEVATED" : "LOW",
+        attackRate > 160
+          ? "CRITICAL"
+          : attackRate > 110
+            ? "HIGH"
+            : attackRate > 50
+              ? "ELEVATED"
+              : "LOW",
     };
   }, [rangeEvents]);
 
   const filteredEvents = useMemo(() => {
     return rangeEvents.filter((event) => {
       const countryMatch =
-        !selectedCountry || event.attacker === selectedCountry || event.target === selectedCountry;
+        !selectedCountry ||
+        event.attacker === selectedCountry ||
+        event.target === selectedCountry;
       const typeMatch = activeTypes.includes(event.attackType);
       return countryMatch && typeMatch;
     });
@@ -242,9 +283,9 @@ export default function Home() {
   };
 
   return (
-    <div className="war-room-bg min-h-screen p-3 text-slate-100 sm:p-4 lg:p-6">
+    <div className="war-room-bg min-h-screen overflow-x-hidden p-3 text-slate-100 sm:p-4 lg:p-6">
       <IntroLoader visible={showIntroLoader} />
-      <div className="mx-auto grid max-w-[1500px] gap-3 sm:gap-4">
+      <div className="mx-auto grid w-full max-w-[1500px] gap-3 sm:gap-4">
         <StatsPanel
           stats={aiOnlyStats ?? DEFAULT_STATS}
           selectedCountry={selectedCountry}
@@ -255,14 +296,18 @@ export default function Home() {
           onDateRangeChange={setDateRange}
         />
 
-        <div className="grid gap-3 sm:gap-4 lg:min-h-[78vh] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
-          <GlobeMap
-            events={filteredEvents}
-            impacts={filteredImpacts}
-            selectedCountry={selectedCountry}
-            onCountrySelect={setSelectedCountry}
-          />
-          <EventFeed events={filteredEvents.slice(0, 120)} />
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:min-h-[78vh] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0">
+            <GlobeMap
+              events={filteredEvents}
+              impacts={filteredImpacts}
+              selectedCountry={selectedCountry}
+              onCountrySelect={setSelectedCountry}
+            />
+          </div>
+          <div className="min-w-0">
+            <EventFeed events={filteredEvents.slice(0, 120)} />
+          </div>
         </div>
       </div>
     </div>
