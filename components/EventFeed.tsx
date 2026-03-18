@@ -98,9 +98,7 @@ export function EventFeed({
                     {event.sourcePublisher}: {event.sourceHeadline}
                   </a>
                 ) : null}
-                <p className="mt-2 text-[10px] text-slate-500">
-                  Ingested: {new Date(event.timestamp).toLocaleString()}
-                </p>
+
                 {event.sourcePublishedAt ? (
                   <p className="text-[10px] text-slate-500">
                     Source date:{" "}

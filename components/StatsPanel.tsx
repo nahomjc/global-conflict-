@@ -20,7 +20,7 @@ interface StatsPanelProps {
 const attackTypes: AttackType[] = ["missile", "drone", "airstrike"];
 const dateRanges: Array<{ id: DateRangeFilter; label: string }> = [
   { id: "today", label: "Today" },
-  { id: "current", label: "Current" },
+  { id: "current", label: "Latest Events" },
   { id: "7d", label: "7 Days" },
   { id: "30d", label: "30 Days" },
   { id: "all", label: "All" },
@@ -50,7 +50,10 @@ export function StatsPanel({
       className="rounded-2xl border border-cyan-500/30 bg-slate-950/75 p-3 backdrop-blur sm:p-4"
     >
       <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
-        <StatCard title="Total Attacks (Range)" value={String(stats.totalAttacksToday)} />
+        <StatCard
+          title="Total Attacks (Range)"
+          value={String(stats.totalAttacksToday)}
+        />
         <StatCard
           title="Most Targeted"
           value={<CountryNameWithFlag country={stats.mostTargetedCountry} />}
@@ -59,7 +62,11 @@ export function StatsPanel({
           title="Most Active Attacker"
           value={<CountryNameWithFlag country={stats.mostActiveAttacker} />}
         />
-        <StatCard title="Global Alert" value={stats.globalAlertLevel} valueClassName={alertColor} />
+        <StatCard
+          title="Global Alert"
+          value={stats.globalAlertLevel}
+          valueClassName={alertColor}
+        />
       </div>
 
       <div className="mt-4 space-y-2 text-xs">
@@ -128,8 +135,12 @@ function StatCard({
 }) {
   return (
     <div className="rounded-xl border border-slate-700/60 bg-slate-900/85 px-3 py-2">
-      <p className="text-[10px] tracking-wide text-slate-400 uppercase">{title}</p>
-      <p className={`mt-1 truncate text-sm font-semibold text-slate-100 sm:text-base ${valueClassName ?? ""}`}>
+      <p className="text-[10px] tracking-wide text-slate-400 uppercase">
+        {title}
+      </p>
+      <p
+        className={`mt-1 truncate text-sm font-semibold text-slate-100 sm:text-base ${valueClassName ?? ""}`}
+      >
         {value}
       </p>
     </div>
