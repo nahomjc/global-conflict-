@@ -6,6 +6,7 @@ import { GlobeMap } from "@/components/GlobeMap";
 import { IntroLoader } from "@/components/IntroLoader";
 import { StatsPanel, type DateRangeFilter } from "@/components/StatsPanel";
 import { CountryNameWithFlag } from "@/components/CountryNameWithFlag";
+import { ConflictChatbot } from "@/components/ConflictChatbot";
 import type {
   AttackType,
   ConflictEvent,
@@ -61,6 +62,7 @@ const DEFAULT_STATS: ConflictStats = {
 };
 const DRAWER_SINCE_YEAR = 2020;
 const DRAWER_PAGE_SIZE = 10;
+const CURRENT_RANGE_DAYS = 10;
 const RANKINGS_START_MS = Date.UTC(2024, 0, 1);
 const RANKINGS_END_MS = Date.UTC(2027, 0, 1);
 const RANKING_PLACEHOLDERS = new Set([
@@ -267,7 +269,7 @@ export default function Home() {
     "drone",
     "airstrike",
   ]);
-  const [dateRange, setDateRange] = useState<DateRangeFilter>("today");
+  const [dateRange, setDateRange] = useState<DateRangeFilter>("current");
   const [isTopCountriesModalOpen, setIsTopCountriesModalOpen] = useState(false);
 
   useEffect(() => {
@@ -389,7 +391,12 @@ export default function Home() {
       return dayStart;
     }
 
-    const days = dateRange === "7d" ? 7 : 30;
+    const days =
+      dateRange === "current"
+        ? CURRENT_RANGE_DAYS
+        : dateRange === "7d"
+          ? 7
+          : 30;
     return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   }, [dateRange]);
 
@@ -399,7 +406,7 @@ export default function Home() {
         if (!rangeStart) {
           return true;
         }
-        return eventIngestMs(event) >= rangeStart.getTime();
+        return eventDateMs(event) >= rangeStart.getTime();
       }),
     [rangeStart, trustedAiEvents],
   );
@@ -478,6 +485,16 @@ export default function Home() {
     });
   }, [activeTypes, rangeEvents, selectedCountry]);
 
+  const sortedFilteredEvents = useMemo(() => {
+    return [...filteredEvents].sort((a, b) => {
+      const sourceDelta = eventDateMs(b) - eventDateMs(a);
+      if (sourceDelta !== 0) {
+        return sourceDelta;
+      }
+      return eventIngestMs(b) - eventIngestMs(a);
+    });
+  }, [filteredEvents]);
+
   const filteredImpacts = useMemo(() => {
     const allowed = new Set(filteredEvents.map((event) => event.id));
     return impacts.filter((impact) => allowed.has(impact.eventId));
@@ -487,6 +504,15 @@ export default function Home() {
     () => !showIntroLoader && (isBootstrapping || trustedAiEvents.length === 0),
     [isBootstrapping, showIntroLoader, trustedAiEvents.length],
   );
+  const eventFeedEmptyMessage = useMemo(() => {
+    if (dateRange === "today") {
+      return "No attacks today.";
+    }
+    if (dateRange === "current") {
+      return `No attacks in the last ${CURRENT_RANGE_DAYS} days.`;
+    }
+    return "Waiting for incoming events...";
+  }, [dateRange]);
 
   const countryTimelineEvents = useMemo(() => drawerEvents, [drawerEvents]);
   useEffect(() => {
@@ -622,10 +648,12 @@ export default function Home() {
           </button>
         </div>
 
+        <ConflictChatbot />
+
         <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:h-[78vh] lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0 lg:h-full lg:min-h-0">
             <GlobeMap
-              events={filteredEvents}
+              events={sortedFilteredEvents}
               impacts={filteredImpacts}
               selectedCountry={selectedCountry}
               onCountrySelect={handleCountrySelect}
@@ -633,8 +661,9 @@ export default function Home() {
           </div>
           <div className="min-w-0 lg:h-full lg:min-h-0">
             <EventFeed
-              events={filteredEvents.slice(0, 120)}
+              events={sortedFilteredEvents.slice(0, 120)}
               waitingForAiResponse={waitingForAiResponse}
+              emptyMessage={eventFeedEmptyMessage}
             />
           </div>
         </div>

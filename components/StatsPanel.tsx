@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import type { AttackType, ConflictStats } from "@/lib/conflict-types";
 import { CountryNameWithFlag } from "@/components/CountryNameWithFlag";
 
-export type DateRangeFilter = "today" | "7d" | "30d" | "all";
+export type DateRangeFilter = "today" | "current" | "7d" | "30d" | "all";
 
 interface StatsPanelProps {
   stats: ConflictStats;
@@ -20,6 +20,7 @@ interface StatsPanelProps {
 const attackTypes: AttackType[] = ["missile", "drone", "airstrike"];
 const dateRanges: Array<{ id: DateRangeFilter; label: string }> = [
   { id: "today", label: "Today" },
+  { id: "current", label: "Current" },
   { id: "7d", label: "7 Days" },
   { id: "30d", label: "30 Days" },
   { id: "all", label: "All" },
