@@ -679,15 +679,17 @@ export default function Home() {
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-cyan-500/25 bg-slate-950/65 px-4 py-3 text-center backdrop-blur sm:px-5 sm:py-4">
-          <p className="text-[10px] tracking-[0.2em] text-cyan-200 uppercase sm:text-xs">
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-400/35 bg-linear-to-b from-slate-900/90 to-slate-950/90 px-4 py-4 text-center shadow-[0_0_30px_rgba(34,211,238,0.15)] backdrop-blur sm:px-5 sm:py-5">
+          <div className="pointer-events-none absolute inset-x-8 bottom-0 h-[2px] rounded-full bg-cyan-300/90 shadow-[0_0_22px_rgba(34,211,238,0.95)]" />
+          <div className="pointer-events-none absolute -top-20 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
+          <p className="text-[10px] tracking-[0.2em] text-cyan-100 uppercase sm:text-xs">
             Situational Reflection
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-slate-200 sm:text-base">
+          <p className="mt-2 text-sm leading-relaxed text-slate-100 [text-shadow:0_0_14px_rgba(34,211,238,0.3)] sm:text-base">
             &ldquo;You will hear of wars and rumors of wars... Nation will rise
             against nation, and kingdom against kingdom.&rdquo;
           </p>
-          <p className="mt-2 text-[11px] tracking-[0.15em] text-cyan-200 uppercase">
+          <p className="mt-2 text-[11px] tracking-[0.15em] text-cyan-200 uppercase [text-shadow:0_0_10px_rgba(34,211,238,0.45)]">
             Matthew 24:6-7
           </p>
         </section>
