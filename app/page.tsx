@@ -277,7 +277,7 @@ export default function Home() {
     "drone",
     "airstrike",
   ]);
-  const [dateRange, setDateRange] = useState<DateRangeFilter>("current");
+  const [dateRange, setDateRange] = useState<DateRangeFilter>("all");
   const [isTopCountriesModalOpen, setIsTopCountriesModalOpen] = useState(false);
   const [dismissedBreakingNews, setDismissedBreakingNews] = useState(true);
 
@@ -532,6 +532,9 @@ export default function Home() {
     if (dateRange === "current") {
       return `No attacks in the last ${CURRENT_RANGE_DAYS} days.`;
     }
+    if (dateRange === "all") {
+      return "No attacks available.";
+    }
     return "Waiting for incoming events...";
   }, [dateRange]);
 
@@ -703,8 +706,10 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setIsTopCountriesModalOpen(true)}
-            className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-cyan-100 uppercase transition hover:border-cyan-300/70 hover:bg-cyan-500/20"
+            className="group relative rounded-full border border-cyan-400/50 bg-cyan-500/10 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-cyan-100 uppercase transition hover:border-cyan-300/70 hover:bg-cyan-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
+            <span className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.35),transparent_55%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <span className="pointer-events-none absolute inset-0 -z-10 rounded-full shadow-[0_0_30px_rgba(34,211,238,0.25)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
             Top Country Rankings
           </button>
         </div>
