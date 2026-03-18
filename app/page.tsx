@@ -174,6 +174,14 @@ function isSpecificStreamActor(value: string) {
     return false;
   }
   if (
+    normalized.includes(" and ") ||
+    normalized.includes(" vs ") ||
+    normalized.includes("/") ||
+    normalized.includes("-")
+  ) {
+    return false;
+  }
+  if (
     normalized.includes("various ") ||
     normalized.includes("multiple ") ||
     normalized.includes("middle east") ||

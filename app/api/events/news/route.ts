@@ -60,26 +60,71 @@ function headlineMentionsCountry(headline: string, country: string) {
   return countryTerms(country).some((term) => normalizedHeadline.includes(term));
 }
 
-const ATTACK_HEADLINE_TERMS = [
-  "missile",
-  "drone",
+const ATTACK_PRIMARY_TERMS = [
   "airstrike",
   "air strike",
-  "strike",
-  "attack",
+  "missile",
+  "drone",
+  "rocket",
+  "bomb",
+  "bombing",
   "shelling",
   "artillery",
-  "bombard",
   "raid",
   "clash",
   "clashes",
-  "rockets",
-  "rocket",
+  "fighting",
+  "assault",
+  "operation",
+];
+
+const ATTACK_CONTEXT_TERMS = [
+  "military",
+  "war",
+  "strike",
+  "strikes",
+  "launched",
+  "aircraft",
+  "infrastructure",
+  "targets",
+  "target",
+];
+
+const NON_CONFLICT_TERMS = [
+  "deal",
+  "billion",
+  "fertilizer",
+  "plant",
+  "marathon",
+  "mlb",
+  "debut",
+  "game",
+  "contract",
+  "tells critics",
 ];
 
 function isAttackHeadline(headline: string) {
   const normalized = normalizeCountry(headline);
-  return ATTACK_HEADLINE_TERMS.some((term) => normalized.includes(term));
+
+  // If it clearly looks like sports/business, ignore it unless it also contains primary kinetic terms.
+  const hasNonConflict = NON_CONFLICT_TERMS.some((term) =>
+    normalized.includes(term),
+  );
+  const hasPrimary = ATTACK_PRIMARY_TERMS.some((term) =>
+    normalized.includes(term),
+  );
+  if (hasNonConflict && !hasPrimary) {
+    return false;
+  }
+
+  if (hasPrimary) {
+    return true;
+  }
+
+  // Allow generic "strike/strikes" only when there is context that suggests military action.
+  const hasStrike = normalized.includes(" strike") || normalized.includes("strikes") || normalized.includes("strike");
+  const hasContext = ATTACK_CONTEXT_TERMS.some((term) => normalized.includes(term));
+  return hasStrike && hasContext && !hasNonConflict;
 }
 
 function inferAttackType(headline: string): ConflictEvent["attackType"] {
@@ -107,6 +152,8 @@ function buildFallbackCountryEvents(
     typeof sinceYear === "number"
       ? Date.UTC(sinceYear, 0, 1)
       : Number.NEGATIVE_INFINITY;
+  const normalizedFocus = normalizeCountry(focusCountry);
+
   return trustedItems
     .filter((item) => headlineMentionsCountry(item.headline, focusCountry))
     .filter((item) => isAttackHeadline(item.headline))
@@ -119,10 +166,20 @@ function buildFallbackCountryEvents(
         Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || ""),
     )
     .slice(0, 120)
-    .map((item) => ({
+    .map((item) => {
+      const normalizedHeadline = normalizeCountry(item.headline);
+      const focusIndex = normalizedHeadline.indexOf(normalizedFocus);
+
+      // Heuristic: if the focus country appears early, treat it as attacker; otherwise as target.
+      const treatAsAttacker = focusIndex !== -1 && focusIndex < 60;
+
+      const attacker = treatAsAttacker ? focusCountry : "Unknown";
+      const target = treatAsAttacker ? "Unknown" : focusCountry;
+
+      return {
       id: randomUUID(),
-      attacker: "Unknown",
-      target: focusCountry,
+      attacker,
+      target,
       startLat: 0,
       startLng: 0,
       endLat: 0,
@@ -137,7 +194,8 @@ function buildFallbackCountryEvents(
       sourceHeadline: item.headline,
       evidenceQuote: item.headline,
       sourcePublishedAt: item.publishedAt || new Date().toISOString(),
-    }));
+      };
+    });
 }
 
 export async function POST(request: NextRequest) {
