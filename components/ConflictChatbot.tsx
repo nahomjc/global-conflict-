@@ -85,39 +85,60 @@ export function ConflictChatbot() {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-controls="conflict-chat-panel"
-        className="fixed right-4 bottom-4 z-50 rounded-full border border-cyan-400/70 bg-cyan-500/20 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-cyan-100 uppercase shadow-lg shadow-cyan-950/50 backdrop-blur transition hover:border-cyan-300 hover:bg-cyan-500/30"
+        className="fixed right-4 bottom-4 z-50 inline-flex items-center gap-2 rounded-full border border-cyan-300/60 bg-slate-900/90 px-4 py-2.5 text-[11px] font-semibold tracking-[0.12em] text-cyan-100 uppercase shadow-xl shadow-slate-950/80 backdrop-blur transition hover:-translate-y-0.5 hover:border-cyan-200/80 hover:bg-slate-800/95"
       >
-        {isOpen ? "Close Chat" : "AI Chat"}
+        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.9)]" />
+        {isOpen ? "Close Chat" : "Conflict AI"}
       </button>
 
       <section
         id="conflict-chat-panel"
-        className={`fixed right-4 bottom-20 z-50 w-[calc(100vw-2rem)] max-w-md rounded-2xl border border-cyan-500/35 bg-slate-950/95 p-4 shadow-2xl backdrop-blur transition-all sm:p-5 ${
+        className={`fixed right-4 bottom-20 z-50 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-2xl border border-slate-700/90 bg-slate-950/95 shadow-2xl shadow-black/70 backdrop-blur transition-all duration-200 ${
           isOpen
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-3 opacity-0"
         }`}
       >
-        <div className="mb-3">
-          <p className="text-[11px] tracking-[0.18em] text-cyan-200 uppercase">
-            AI Conflict Chat
-          </p>
-          <p className="mt-1 text-xs text-slate-300">
-            Scope: conflicts and wars only. Non-conflict requests are refused.
-          </p>
+        <div className="border-b border-slate-800/90 bg-slate-900/80 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] tracking-[0.16em] text-cyan-200 uppercase">
+                Operational Assistant
+              </p>
+              <h3 className="mt-0.5 text-sm font-semibold text-slate-100">
+                Conflict Analysis Chat
+              </h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                Wars and conflict topics only. Includes a Bible verse in each
+                response.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-medium tracking-[0.08em] text-slate-300 uppercase transition hover:border-cyan-300/70 hover:text-cyan-100"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
-        <div className="scrollbar-thin mb-3 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-700/70 bg-slate-900/70 p-2 sm:max-h-72">
+        <div className="space-y-3 px-4 pt-3 pb-4">
+          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-[11px] text-cyan-100">
+            Scope notice: Non-conflict requests are refused automatically.
+          </div>
+
+          <div className="scrollbar-thin max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/60 p-2.5 sm:max-h-72">
           {messages.map((message) => (
             <article
               key={message.id}
-              className={`rounded-lg border px-3 py-2 text-xs whitespace-pre-wrap ${
+              className={`rounded-lg border px-3 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
                 message.role === "assistant"
-                  ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-100"
-                  : "border-slate-600/80 bg-slate-800/80 text-slate-100"
+                  ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-50"
+                  : "border-slate-700 bg-slate-800/80 text-slate-100"
               }`}
             >
-              <p className="mb-1 text-[10px] tracking-[0.12em] uppercase opacity-70">
+              <p className="mb-1 text-[10px] font-semibold tracking-widest uppercase opacity-80">
                 {message.role === "assistant" ? "Assistant" : "You"}
               </p>
               <p>{message.text}</p>
@@ -128,24 +149,30 @@ export function ConflictChatbot() {
               Processing conflict response...
             </article>
           ) : null}
-        </div>
+          </div>
 
-        <form onSubmit={onSubmit} className="space-y-2">
-          <textarea
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            rows={3}
-            placeholder="Ask about airstrikes, drones, wars, battle zones, ceasefires..."
-            className="w-full resize-none rounded-lg border border-slate-600/70 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/80"
-          />
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="rounded-full border border-cyan-400/60 bg-cyan-500/10 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-cyan-100 uppercase transition hover:border-cyan-300/80 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Send Question
-          </button>
-        </form>
+          <form onSubmit={onSubmit} className="space-y-2">
+            <textarea
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              rows={3}
+              placeholder="Ask about airstrikes, drones, wars, battle zones, or ceasefires..."
+              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/80"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-slate-500">
+                Professional scope: conflict intelligence only.
+              </p>
+              <button
+                type="submit"
+                disabled={!canSend}
+                className="rounded-full border border-cyan-300/70 bg-cyan-500/15 px-4 py-2 text-[11px] font-semibold tracking-[0.08em] text-cyan-100 uppercase transition hover:border-cyan-200 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Send
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
     </>
   );

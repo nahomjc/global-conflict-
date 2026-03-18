@@ -271,6 +271,7 @@ export default function Home() {
   ]);
   const [dateRange, setDateRange] = useState<DateRangeFilter>("current");
   const [isTopCountriesModalOpen, setIsTopCountriesModalOpen] = useState(false);
+  const [dismissedBreakingNews, setDismissedBreakingNews] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowIntroLoader(false), 2400);
@@ -504,6 +505,18 @@ export default function Home() {
     () => !showIntroLoader && (isBootstrapping || trustedAiEvents.length === 0),
     [isBootstrapping, showIntroLoader, trustedAiEvents.length],
   );
+
+  const todayEventsCount = useMemo(() => {
+    const now = new Date();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const startMs = dayStart.getTime();
+    return trustedAiEvents.filter((event) => eventIngestMs(event) >= startMs)
+      .length;
+  }, [trustedAiEvents]);
+
+  const shouldShowBreakingNews =
+    !showIntroLoader && !dismissedBreakingNews && todayEventsCount > 0;
   const eventFeedEmptyMessage = useMemo(() => {
     if (dateRange === "today") {
       return "No attacks today.";
@@ -615,6 +628,46 @@ export default function Home() {
     <div className="war-room-bg min-h-screen overflow-x-hidden p-3 text-slate-100 sm:p-4 lg:p-6">
       <IntroLoader visible={showIntroLoader} />
       <div className="mx-auto grid w-full max-w-[1500px] gap-3 sm:gap-4">
+        {shouldShowBreakingNews ? (
+          <div className="relative overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 shadow-[0_0_40px_rgba(248,113,113,0.10)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(248,113,113,0.22),transparent_55%),radial-gradient(circle_at_80%_40%,rgba(56,189,248,0.12),transparent_55%)]" />
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 inline-flex h-3 w-3 animate-pulse rounded-full bg-red-400 shadow-[0_0_24px_rgba(248,113,113,0.55)]" />
+                <div>
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-red-200 uppercase">
+                    BREAKING NEWS
+                  </p>
+                  <p className="mt-1 text-sm text-slate-200">
+                    War and strikes reported today.{" "}
+                    <span className="font-semibold text-slate-100">
+                      {todayEventsCount}
+                    </span>{" "}
+                    incidents detected.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDateRange("today")}
+                  className="rounded-full border border-red-300/40 bg-red-500/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-red-200 transition hover:border-red-300/70 hover:bg-red-500/20"
+                >
+                  View Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedBreakingNews(true)}
+                  className="rounded-md border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs text-slate-200 hover:border-cyan-300/40"
+                  aria-label="Dismiss breaking news"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <section className="rounded-2xl border border-cyan-500/25 bg-slate-950/65 px-4 py-3 text-center backdrop-blur sm:px-5 sm:py-4">
           <p className="text-[10px] tracking-[0.2em] text-cyan-200 uppercase sm:text-xs">
             Situational Reflection

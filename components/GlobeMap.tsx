@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { Color, TextureLoader } from "three";
+import { getCountryDisplay, getCountryFlagPngUrl } from "@/lib/country-display";
 import type { ConflictEvent, ImpactPulse } from "@/lib/conflict-types";
 
 const Globe = dynamic(
@@ -298,9 +299,20 @@ export function GlobeMap({
                 ? "rgba(103, 232, 249, 0.9)"
                 : "rgba(56, 189, 248, 0.3)";
             }}
-            polygonLabel={(polygon: CountryPolygon) =>
-              polygon.properties?.NAME ?? polygon.properties?.name ?? "Unknown"
-            }
+            polygonLabel={(polygon: CountryPolygon) => {
+              const rawName =
+                polygon.properties?.NAME ?? polygon.properties?.name ?? "Unknown";
+              const display = getCountryDisplay(rawName);
+              const flagUrl = getCountryFlagPngUrl(rawName);
+              return `<div style="padding:2px 6px;display:flex;align-items:center;gap:6px;">
+                ${
+                  flagUrl
+                    ? `<img src="${flagUrl}" alt="" style="width:18px;height:13px;border-radius:2px;border:1px solid rgba(148,163,184,0.45);" />`
+                    : `<span style="font-size:12px;">🏳️</span>`
+                }
+                <b>${display.name}</b>
+              </div>`;
+            }}
             onPolygonClick={(polygon: CountryPolygon) =>
               onCountrySelect(
                 polygon.properties?.NAME ?? polygon.properties?.name ?? null,
