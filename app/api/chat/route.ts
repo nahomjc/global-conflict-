@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchTrustedConflictNews, type NewsItem } from "@/lib/news";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,67 @@ const CONFLICT_KEYWORDS = [
   "frontline",
   "combat",
   "insurgency",
+  "attack",
+  "attacks",
+  "raid",
+  "raids",
+  "bombing",
+  "bombings",
+  "offensive",
+  "retaliation",
+  "hostilities",
+  "clash",
+  "clashes",
+  "battlefield",
+  "gaza",
+  "israel",
+  "palestine",
+  "ukraine",
+  "russia",
+  "iran",
+  "syria",
+  "lebanon",
+  "yemen",
+  "sudan",
+];
+
+const CONFLICT_COUNTRIES = [
+  "israel",
+  "palestine",
+  "gaza",
+  "ukraine",
+  "russia",
+  "iran",
+  "syria",
+  "lebanon",
+  "yemen",
+  "sudan",
+  "myanmar",
+  "iraq",
+  "afghanistan",
+  "libya",
+];
+
+const CONFLICT_INTENT_TERMS = [
+  "attack",
+  "attacked",
+  "attacking",
+  "strike",
+  "struck",
+  "strikes",
+  "bomb",
+  "bombed",
+  "raid",
+  "raids",
+  "war",
+  "conflict",
+  "military",
+  "ceasefire",
+  "frontline",
+  "happened",
+  "today",
+  "latest",
+  "now",
 ];
 
 type BibleVerse = {
@@ -62,9 +124,74 @@ function normalize(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function isGreetingQuestion(question: string) {
+  const normalized = normalize(question)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .trim();
+  return [
+    "hi",
+    "hello",
+    "hey",
+    "yo",
+    "good morning",
+    "good afternoon",
+    "good evening",
+  ].includes(normalized);
+}
+
 function isConflictQuestion(question: string) {
   const normalized = normalize(question);
-  return CONFLICT_KEYWORDS.some((keyword) => normalized.includes(keyword));
+  if (CONFLICT_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return true;
+  }
+
+  const hasCountry = CONFLICT_COUNTRIES.some((country) =>
+    normalized.includes(country),
+  );
+  const hasConflictIntent = CONFLICT_INTENT_TERMS.some((term) =>
+    normalized.includes(term),
+  );
+  return hasCountry && hasConflictIntent;
+}
+
+function extractCountryHint(question: string) {
+  const normalized = normalize(question);
+  const match = CONFLICT_COUNTRIES.find((country) =>
+    normalized.includes(country),
+  );
+  return match ? match[0].toUpperCase() + match.slice(1) : undefined;
+}
+
+function wantsFreshWindow(question: string) {
+  const normalized = normalize(question);
+  return (
+    normalized.includes("today") ||
+    normalized.includes("latest") ||
+    normalized.includes("right now") ||
+    normalized.includes("now")
+  );
+}
+
+function formatEvidence(items: NewsItem[]) {
+  if (items.length === 0) {
+    return "No trusted conflict headlines were found in the selected window.";
+  }
+
+  return items
+    .slice(0, 8)
+    .map((item, index) => {
+      const date = item.publishedAt
+        ? new Date(item.publishedAt).toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Unknown time";
+      return `${index + 1}. [${item.publisher}] ${item.headline} (${date})`;
+    })
+    .join("\n");
 }
 
 function pickVerse(question: string): BibleVerse {
@@ -97,13 +224,18 @@ function pickVerse(question: string): BibleVerse {
 async function generateConflictAnswer(
   question: string,
   verse: BibleVerse,
+  evidenceItems: NewsItem[],
 ): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
+  const evidenceText = formatEvidence(evidenceItems);
+
   if (!apiKey) {
     return [
-      "Conflict-only response:",
-      `Your question: "${question}"`,
-      "I can discuss conflict dynamics, military patterns, and war-related risk context. No non-conflict topics are supported.",
+      "Conflict brief:",
+      `Question: ${question}`,
+      "Model connection unavailable. Reporting based on trusted conflict resources currently fetched:",
+      evidenceText,
+      "Assessment: If no matching headline explicitly confirms the claim, treat it as not confirmed yet.",
       `Bible verse connection: ${verse.reference} - "${verse.text}"`,
     ].join("\n\n");
   }
@@ -123,11 +255,20 @@ async function generateConflictAnswer(
         {
           role: "system",
           content:
-            "You are a conflict and war assistant. Only answer conflict/war questions. If user asks anything else, refuse and restate scope. Keep answers concise, factual, and avoid unrelated topics. Always include exactly one Bible verse reference connected to the conflict context in the answer.",
+            "You are a professional conflict-intelligence assistant. Only answer conflict/war questions. Base your answer strictly on provided trusted headlines. Do not fabricate events. If evidence is insufficient, clearly say 'not confirmed by trusted sources yet'. Keep answer concise and structured. Include exactly one Bible verse connection at the end.",
         },
         {
           role: "user",
-          content: `Question: ${question}\n\nRequired verse: ${verse.reference} - ${verse.text}`,
+          content: `Question: ${question}
+
+Trusted resources:
+${evidenceText}
+
+Output format:
+1) Direct answer (1-2 sentences)
+2) Evidence summary (2-4 bullets from trusted resources)
+3) Confidence: High/Medium/Low
+4) Bible verse connection: ${verse.reference} - ${verse.text}`,
         },
       ],
     }),
@@ -135,8 +276,9 @@ async function generateConflictAnswer(
 
   if (!response.ok) {
     return [
-      "Conflict-only response:",
-      "I could not reach the AI model right now, but I can still keep scope restricted to conflicts and wars.",
+      "Conflict brief:",
+      "AI model request failed. Reporting from trusted resources:",
+      evidenceText,
       `Bible verse connection: ${verse.reference} - "${verse.text}"`,
     ].join("\n\n");
   }
@@ -147,8 +289,9 @@ async function generateConflictAnswer(
   const content = payload.choices?.[0]?.message?.content?.trim();
   if (!content) {
     return [
-      "Conflict-only response:",
-      "I could not generate a detailed answer at the moment.",
+      "Conflict brief:",
+      "No model text was returned. Reporting from trusted resources:",
+      evidenceText,
       `Bible verse connection: ${verse.reference} - "${verse.text}"`,
     ].join("\n\n");
   }
@@ -179,18 +322,33 @@ export async function POST(request: Request) {
     );
   }
 
+  if (isGreetingQuestion(question)) {
+    return NextResponse.json({
+      ok: true,
+      answer:
+        "Hi, I am here to assist you.\n\nI provide updates and analysis only on conflicts and wars (airstrikes, drones, missile attacks, military operations).\n\nYou can ask something like: \"Did Israel launch an airstrike today?\"",
+      scopeNotice: SCOPE_NOTICE,
+    });
+  }
+
   if (!isConflictQuestion(question)) {
     const verse = VERSES.season;
     return NextResponse.json({
       ok: true,
-      answer: `${SCOPE_NOTICE}\n\nPlease ask about conflicts or wars only.\n\nBible verse connection: ${verse.reference} - "${verse.text}"`,
+      answer: `${SCOPE_NOTICE}\n\nPlease ask about conflicts or wars only (example: "Did Israel launch an airstrike today?").\n\nBible verse connection: ${verse.reference} - "${verse.text}"`,
       scopeNotice: SCOPE_NOTICE,
       verse,
     });
   }
 
   const verse = pickVerse(question);
-  const answer = await generateConflictAnswer(question, verse);
+  const countryHint = extractCountryHint(question);
+  const evidenceItems = await fetchTrustedConflictNews({
+    country: countryHint,
+    limit: wantsFreshWindow(question) ? 18 : 10,
+    includeUntrusted: false,
+  });
+  const answer = await generateConflictAnswer(question, verse, evidenceItems);
 
   return NextResponse.json({
     ok: true,
