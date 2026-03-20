@@ -22,6 +22,9 @@ const TRUSTED_PUBLISHERS = new Set([
   "AP News",
   "BBC News",
   "Al Jazeera",
+  "Al Jazeera English",
+  "Al Jazeera America",
+  "Al Jazeera Arabic",
   "The Washington Post",
   "The New York Times",
   "Financial Times",
@@ -53,8 +56,18 @@ const TRUSTED_DOMAINS = [
 
 const NEWS_FEEDS = [
   "https://feeds.reuters.com/Reuters/worldNews",
+  "https://www.aljazeera.com/xml/rss/all.xml",
+  "https://www.aljazeera.com/xml/rss/news.xml",
+  "https://news.google.com/rss/search?q=Ukraine+Russia+war+attack+missile&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=Yemen+Houthi+strike+attack+drone&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=Syria+strike+attack+conflict&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=Lebanon+Israel+Hezbollah+strike&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=Sudan+conflict+attack+war&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=UAE+Iran+missile+drone+attack&hl=en-US&gl=US&ceid=US:en",
   "https://news.google.com/rss/search?q=global+conflict+missile+attack&hl=en-US&gl=US&ceid=US:en",
   "https://news.google.com/rss/search?q=military+drone+airstrike+war&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=iran+israel+uae+missile+drone+attack&hl=en-US&gl=US&ceid=US:en",
+  "https://news.google.com/rss/search?q=Gaza+Israel+strike+attack&hl=en-US&gl=US&ceid=US:en",
 ];
 const RECENT_WINDOW_MS = Number(process.env.TRUSTED_NEWS_MAX_AGE_HOURS ?? 720) * 60 * 60 * 1000;
 
@@ -91,7 +104,44 @@ function getDomain(url: string) {
   }
 }
 
-function detectPublisher(rawTitle: string, sourceTag: string, feedUrl: string) {
+const DOMAIN_TO_PUBLISHER: Record<string, string> = {
+  "reuters.com": "Reuters",
+  "apnews.com": "AP News",
+  "bbc.com": "BBC News",
+  "bbc.co.uk": "BBC News",
+  "aljazeera.com": "Al Jazeera",
+  "washingtonpost.com": "The Washington Post",
+  "nytimes.com": "The New York Times",
+  "ft.com": "Financial Times",
+  "wsj.com": "The Wall Street Journal",
+  "bloomberg.com": "Bloomberg",
+  "cnn.com": "CNN",
+  "theguardian.com": "The Guardian",
+  "npr.org": "NPR",
+  "dw.com": "Deutsche Welle",
+  "france24.com": "France 24",
+  "timesofindia.indiatimes.com": "Times of India",
+  "indiatimes.com": "Times of India",
+  "thehindu.com": "The Hindu",
+  "hindustantimes.com": "Hindustan Times",
+  "indianexpress.com": "The Indian Express",
+};
+
+function publisherFromDomain(domain: string): string {
+  if (!domain) return "";
+  const lower = domain.toLowerCase();
+  for (const [d, name] of Object.entries(DOMAIN_TO_PUBLISHER)) {
+    if (lower === d || lower.endsWith(`.${d}`)) return name;
+  }
+  return "";
+}
+
+function detectPublisher(
+  rawTitle: string,
+  sourceTag: string,
+  feedUrl: string,
+  articleDomain: string,
+) {
   if (sourceTag) {
     return sourceTag;
   }
@@ -103,6 +153,14 @@ function detectPublisher(rawTitle: string, sourceTag: string, feedUrl: string) {
 
   if (feedUrl.includes("reuters.com")) {
     return "Reuters";
+  }
+  if (feedUrl.includes("aljazeera.com")) {
+    return "Al Jazeera";
+  }
+
+  const fromDomain = publisherFromDomain(articleDomain);
+  if (fromDomain) {
+    return fromDomain;
   }
 
   return "Unknown";
@@ -165,8 +223,8 @@ async function pullFromFeed(feedUrl: string): Promise<NewsItem[]> {
         const sourceTag = extractTag(itemXml, "source");
         const pubDate = extractTag(itemXml, "pubDate");
         const headline = cleanTitle(rawTitle);
-        const publisher = detectPublisher(rawTitle, sourceTag, feedUrl);
         const domain = getDomain(link);
+        const publisher = detectPublisher(rawTitle, sourceTag, feedUrl, domain);
         return {
           headline,
           url: link,
@@ -220,10 +278,11 @@ export async function fetchTrustedConflictNews(
         merged.set(item.url, item);
       }
     }
-    if (merged.size >= limit) {
-      break;
-    }
   }
 
-  return Array.from(merged.values()).slice(0, limit);
+  const sorted = Array.from(merged.values()).sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  return sorted.slice(0, limit);
 }

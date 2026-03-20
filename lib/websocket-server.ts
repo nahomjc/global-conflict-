@@ -105,7 +105,10 @@ function publishEvent(event: ConflictEvent) {
 
 async function pollAiEvents() {
   console.log("[ws] Polling AI events via /api/events/news pipeline.");
-  const trustedItems = await fetchTrustedConflictNews();
+  const trustedItems = await fetchTrustedConflictNews({
+    limit: 80,
+    includeUntrusted: true,
+  });
   const aiEvents = await extractConflictEventsFromNews(trustedItems);
   console.log("[ws] Trusted headlines:", trustedItems.length, "| AI events:", aiEvents.length);
   for (const event of aiEvents) {

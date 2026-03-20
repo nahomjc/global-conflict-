@@ -279,7 +279,7 @@ export default function Home() {
   ]);
   const [dateRange, setDateRange] = useState<DateRangeFilter>("all");
   const [isTopCountriesModalOpen, setIsTopCountriesModalOpen] = useState(false);
-  const [dismissedBreakingNews, setDismissedBreakingNews] = useState(true);
+  const [dismissedBreakingNews, setDismissedBreakingNews] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowIntroLoader(false), 2400);
@@ -519,7 +519,7 @@ export default function Home() {
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
     const startMs = dayStart.getTime();
-    return trustedAiEvents.filter((event) => eventIngestMs(event) >= startMs)
+    return trustedAiEvents.filter((event) => eventDateMs(event) >= startMs)
       .length;
   }, [trustedAiEvents]);
 
