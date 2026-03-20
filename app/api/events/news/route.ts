@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
   const trustedItems = await fetchTrustedConflictNews(
     focusCountry
       ? { country: focusCountry, sinceYear, limit: 120, includeUntrusted: true }
-      : { limit: 12 },
+      : { limit: 120, includeUntrusted: true },
   );
   const events = await extractConflictEventsFromNews(
     trustedItems,
@@ -307,11 +307,13 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const eventsToReturn = allTrustedEvents.slice(0, 200);
+
   return NextResponse.json({
     ok: true,
     trustedHeadlines: trustedItems.length,
     extracted: events.length,
-    events,
+    events: eventsToReturn,
     countryEvents: paginatedCountryEvents,
     totalCountryEvents,
     currentPage,
